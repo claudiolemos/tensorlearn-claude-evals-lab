@@ -5,7 +5,28 @@
     "RATE-1",
     "PRIVACY-1"
   ],
-  "inputDescription": "TODO describe workload and starting revision",
+  "inputDescription": "fixtures/workload.json: 60 status requests from one customer (CUS-000123), 10 ms apart (0 to 590 ms), replayed through observe() of the revision under test. The starting revision is the released starter (a4d88ab), where references/good.mjs keeps the 30-second per-customer cache and references/broken.mjs is the regression that removed it. The good revision makes 1 upstream call; the broken one makes 60 within 590 ms.",
   "assertion": "evals/assert.mjs",
-  "checks": []
+  "checks": [
+    {
+      "id": "evidence-shape",
+      "requirementId": "CACHE-1, RATE-1, PRIVACY-1",
+      "condition": "The observation is an object with non-empty requests, arrays upstreamCalls/responses/logs, well-formed {customerCode, atMs} entries, string log lines and a requirements object with positive maxRequestsPerSecond and cacheTtlMs and non-empty forbiddenLogFragments. Otherwise it fails with MALFORMED, because none of the requirements can be judged."
+    },
+    {
+      "id": "cache-per-customer",
+      "requirementId": "CACHE-1",
+      "condition": "Grouping upstreamCalls by customerCode and ordering each group by atMs, every consecutive pair is at least requirements.cacheTtlMs (30000 ms) apart. A refresh exactly 30000 ms later passes; different customers are judged independently."
+    },
+    {
+      "id": "rate-rolling-window",
+      "requirementId": "RATE-1",
+      "condition": "For every rolling window [t, t + 1000 ms) over upstreamCalls (not incoming requests), the number of calls is at most requirements.maxRequestsPerSecond (50). 50 calls in one second pass; 51 fail."
+    },
+    {
+      "id": "logs-no-clinical-payload",
+      "requirementId": "PRIVACY-1",
+      "condition": "No string in logs contains any entry of requirements.forbiddenLogFragments (case-insensitive substring). Any other log text passes, so refactors may change harmless log wording."
+    }
+  ]
 }
